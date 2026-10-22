@@ -1,0 +1,36 @@
+# Guest runtime modules copied to ~/.local/bin by install.sh and scripts/deploy-webrtc-experiment.sh.
+# One path per line, relative to native/. Add every new guest module here.
+tools/media-probe/portal.py
+tools/media-probe/portal_recovery.py
+tools/media-probe/media_config.py
+tools/media-probe/encoder.py
+tools/media-probe/rtp_timing.py
+tools/media-probe/startup_watchdog.py
+tools/media-probe/capture_bootstrap.py
+tools/media-probe/session_watchdog.py
+tools/media-probe/av_sync.py
+tools/media-probe/gsr_capture.py
+tools/media-probe/webrtc_sender.py
+tools/media-probe/input_bridge.py
+tools/media-probe/voxtype_hotkey.py
+tools/media-probe/latency_target.py
+tools/media-probe/guest_state.py
+tools/media-probe/audio_sink.py
+tools/media-probe/audio_source.py
+tools/media-probe/clipboard_sync.py
+tools/media-probe/display_mode.py
+tools/media-probe/active_window.py
+tools/media-probe/bar_nudge.py
+tools/media-probe/compact_bar.py
+tools/media-probe/local_reclaim.py
+tools/media-probe/local_mute.py
+tools/media-probe/virtual_mic.py
+tools/media-probe/power_profile.py
+tools/media-probe/remote_picker.py
+tools/media-probe/virtual_display.py
+tools/media-probe/latency_trace.py
+tools/media-probe/keyboard_items.py
+tools/media-probe/keyboard_check.py
+tools/media-probe/av_sync_target.py
+tools/media-probe/focus_release_probe.py
+tools/media-probe/focus_release_target.py

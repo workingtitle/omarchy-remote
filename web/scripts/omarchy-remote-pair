@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# Pair a phone, tablet or Mac with this machine. Shows a QR code and a six-digit code for five
+# minutes, then asks here, on the machine's own screen, before a device is accepted.
+# Talks only to the local service (loopback, no Origin); needs curl and jq, qrencode for the QR code.
+#   omarchy-remote-pair            open a pairing offer
+#   omarchy-remote-pair --devices  list paired devices
+set -euo pipefail
+port="${PORT:-8099}"
+api() { curl -fsS -m 5 -H "Host: localhost:$port" -H 'Content-Type: application/json' -X "$1" "http://127.0.0.1:$port/api/local/$2" ${3:+-d "$3"}; }
+
+if [[ ${1:-} == --devices ]]; then
+  api POST devices | jq -r '.devices[] | "\(.name)\t\(.login // "-")\tpaired \(.approved)\t\(.id)"'
+  exit 0
+fi
+
+# Started from the bar icon the dialog runs in Omarchy's small floating terminal, which cuts off the QR code:
+# show that window fullscreen (a plain terminal window is left alone). The window is found by this script's own process
+# chain, not by the focus (which the new window does not always have yet), and given a moment to appear.
+# Best effort, never stops pairing.
+fullscreen_dialog() {
+  command -v hyprctl >/dev/null && command -v jq >/dev/null || return 0
+  local chain=" $$ " p=$$ window='' try address state active
+  while p=$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' '); [[ -n $p && $p != 0 && $p != 1 ]]; do chain+="$p "; done
+  for try in 1 2 3 4 5 6 7 8; do
+    window=$(timeout 2 hyprctl -j clients 2>/dev/null | jq -r --arg chain "$chain" \
+      '[.[] | select(.class == "org.omarchy.terminal") | (.pid | tostring) as $pid | select($chain | contains(" " + $pid + " "))] | first // empty | "\(.address) \(.fullscreen)"' 2>/dev/null) || return 0
+    [[ -n $window ]] && break
+    sleep 0.25
+  done
+  [[ -n $window ]] || return 0
+  read -r address state <<<"$window"
+  [[ $state == 0 ]] || return 0
+  timeout 2 hyprctl dispatch "hl.dsp.focus({ window = \"address:$address\" })" >/dev/null 2>&1 || return 0
+  active=$(timeout 2 hyprctl -j activewindow 2>/dev/null | jq -r '.address // ""' 2>/dev/null)
+  [[ $active == "$address" ]] || return 0   # the toggle acts on the focused window: never on another one
+  timeout 2 hyprctl dispatch 'hl.dsp.window.fullscreen({ mode = "fullscreen" })' >/dev/null 2>&1 || true
+}
+
+offer=$(api POST pair/start) || { echo "The Omarchy Remote service is not running (systemctl --user status omarchy-remote)." >&2; exit 1; }
+url="$(jq -r .url <<<"$offer")#$(jq -r .token <<<"$offer")"
+code=$(jq -r .code <<<"$offer")
+trap 'api POST pair/cancel >/dev/null 2>&1 || true' EXIT
+fullscreen_dialog
+sleep 0.3   # let the terminal take its new size before the QR code is drawn
+clear 2>/dev/null || true
+echo "Pair a device with Omarchy Remote"
+echo
+if command -v qrencode >/dev/null; then qrencode -t ANSIUTF8 -m 2 "$url"; else echo "(install qrencode to show a QR code)"; fi
+echo
+page=$(jq -r .url <<<"$offer")
+echo "    ${code:0:3} ${code:3:3}"
+echo
+echo "iPhone/iPad: scan the QR code with the camera."
+echo "Mac app:     Add a Machine with ${page%/pair.html} and this code."
+[[ $(jq -r '.browser // true' <<<"$offer") == true ]] && echo "Browser:     open $page and type this code (pairs that browser only)."
+echo
+echo "The device must be signed in to the same Tailscale account. Valid for 5 minutes."
+
+deadline=$((SECONDS + 300))
+while (( SECONDS < deadline )); do
+  request=$(api POST pair/pending | jq -c '.pending[0] // empty')
+  if [[ -n $request ]]; then
+    name=$(jq -r .name <<<"$request"); login=$(jq -r '.login // "unknown account"' <<<"$request")
+    check=$(jq -r .fingerprint <<<"$request")
+    echo
+    echo "Pairing request: \"$name\" ($login)"
+    echo "Device check: ${check:0:4} ${check:4:4} (the device shows the same)"
+    read -r -p "Allow this device to control this machine? [Y/n] " answer
+    approve=true; [[ $answer =~ ^[Nn] ]] && approve=false   # Enter allows: the dialog was opened on the machine, for this device
+    api POST pair/decide "$(jq -nc --arg id "$(jq -r .id <<<"$request")" --argjson approve $approve '{id:$id, approve:$approve}')" >/dev/null
+    $approve && echo "Paired." || echo "Declined."
+    sleep 2
+    exit 0
+  fi
+  sleep 1
+done
+echo "No device asked to pair within five minutes."

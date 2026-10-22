@@ -1,0 +1,70 @@
+#!/bin/bash
+# Approve sudo with Face ID / Touch ID: wires the PAM helper into /etc/pam.d/sudo (opt-in, reversible).
+#
+#   omarchy-remote-sudo-approval            check only (nothing is changed)
+#   sudo omarchy-remote-sudo-approval --enable
+#   sudo omarchy-remote-sudo-approval --disable
+#
+# What --enable does: installs the helper (omarchy-remote-sudo-approve) as root-owned /usr/local/lib/omarchy-remote/sudo-approve
+# and adds ONE line at the top of the auth section of /etc/pam.d/sudo:
+#   auth sufficient pam_exec.so quiet /usr/local/lib/omarchy-remote/sudo-approve
+# `sufficient`: if the helper succeeds (a paired device approved with Face ID / Touch ID) sudo does not ask for the
+# password; in every other case (no device connected, denied, timeout, service down) the line is skipped and sudo asks
+# for the password exactly as before, so this cannot lock you out of sudo. The original file is saved first.
+set -u
+LINE_MARK='# omarchy-remote-sudo-approval'
+PAM=/etc/pam.d/sudo
+HELPER_DIR=/usr/local/lib/omarchy-remote
+HELPER=$HELPER_DIR/sudo-approve
+BACKUP_DIR=/etc/omarchy-remote/sudo-approval
+LINE="auth       sufficient   pam_exec.so quiet $HELPER $LINE_MARK"
+SOURCE=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)/omarchy-remote-sudo-approve
+URL=${OMARCHY_REMOTE_LOCAL_URL:-http://127.0.0.1:8099}
+
+say() { printf '%s\n' "$*"; }
+enabled() { grep -qF "$LINE_MARK" "$PAM" 2>/dev/null; }
+
+check() {
+  local ok=0
+  [[ -r $PAM ]] && say "ok   $PAM readable" || { say "FAIL $PAM not readable"; ok=1; }
+  [[ -f /usr/lib/security/pam_exec.so || -f /usr/lib64/security/pam_exec.so || -f /lib/security/pam_exec.so ]] \
+    && say "ok   pam_exec.so installed" || { say "FAIL pam_exec.so not found"; ok=1; }
+  [[ -f $SOURCE ]] && say "ok   helper source found" || { say "FAIL helper source missing: $SOURCE"; ok=1; }
+  if curl -fsS -m 3 "$URL/api/local/approval/ready" >/dev/null 2>&1; then say "ok   service answers on $URL"
+  else say "WARN service not reachable on $URL (needs the update with sudo approval; restart omarchy-remote)"; fi
+  if enabled; then say "info sudo approval is ENABLED"; else say "info sudo approval is off"; fi
+  say "info with a device connected the approval line is tried first; without one sudo asks for the password at once"
+  return $ok
+}
+
+need_root() { [[ $EUID -eq 0 ]] || { say "Run with sudo."; exit 1; }; }
+
+enable() {
+  need_root
+  check >/dev/null || { check; say "Not changing anything."; exit 1; }
+  install -d -m 0755 "$HELPER_DIR" "$BACKUP_DIR"
+  sed '1s|^#!.*|#!/usr/bin/python3|' "$SOURCE" > "$HELPER.tmp" && chmod 0755 "$HELPER.tmp" && chown root:root "$HELPER.tmp" && mv "$HELPER.tmp" "$HELPER"
+  [[ -f $BACKUP_DIR/sudo.orig ]] || cp -p "$PAM" "$BACKUP_DIR/sudo.orig"
+  if enabled; then say "Already enabled."; exit 0; fi
+  # After the #%PAM-1.0 header, before the first auth line.
+  awk -v line="$LINE" 'BEGIN{done=0} /^auth[ \t]/ && !done {print line; done=1} {print}' "$PAM" > "$PAM.tmp" \
+    && grep -qF "$LINE_MARK" "$PAM.tmp" && chmod 0644 "$PAM.tmp" && mv "$PAM.tmp" "$PAM" || { rm -f "$PAM.tmp"; say "Could not edit $PAM."; exit 1; }
+  say "Enabled. A sudo now asks your connected device first (Face ID / Touch ID), and the password when that is not answered."
+  say "Undo: sudo $0 --disable   (original saved in $BACKUP_DIR/sudo.orig)"
+}
+
+disable() {
+  need_root
+  if enabled; then
+    grep -vF "$LINE_MARK" "$PAM" > "$PAM.tmp" && chmod 0644 "$PAM.tmp" && mv "$PAM.tmp" "$PAM" || { rm -f "$PAM.tmp"; say "Could not edit $PAM."; exit 1; }
+  fi
+  rm -f "$HELPER"
+  say "Disabled: the line is removed and the helper deleted."
+}
+
+case "${1:-}" in
+  "") check ;;
+  --enable) enable ;;
+  --disable) disable ;;
+  *) say "Usage: $0 [--enable|--disable]"; exit 2 ;;
+esac

@@ -1,0 +1,20 @@
+[Unit]
+Description=Omarchy Remote browser desktop
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Projects/omarchy-remote/web
+ExecStart=%h/Projects/omarchy-remote/web/scripts/start.sh
+EnvironmentFile=-%h/.config/omarchy-remote/environment
+Restart=on-failure
+RestartSec=3
+KillMode=control-group
+TimeoutStopSec=5
+UMask=0077
+# No NoNewPrivileges here: the app's terminal starts its shell as a child of this service and inherits it, which made sudo
+# (and anything setuid) fail with "The no new privileges flag is set". The service already gives a paired device a shell as this user.
+
+[Install]
+WantedBy=graphical-session.target

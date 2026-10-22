@@ -1,0 +1,319 @@
+/* Omarchy Remote. Every color is a token filled from the active Omarchy theme
+   (theme.mjs); the values below are Omarchy's default theme, Tokyo Night, for
+   the first paint. Layout insets (--dock-*, --keyboard-inset) come from panels.mjs. */
+:root {
+  color-scheme: dark;
+  --bg: #1a1b26; --bg-2: #24283b; --bg-3: #13141c; --raise: #292e42; --line: #292e42; --muted: #414868;
+  --fg: #c0caf5; --fg-2: #a9b1d6; --fg-3: color-mix(in srgb, #565f89 72%, #a9b1d6);
+  --accent: #7aa2f7; --on-accent: #1a1b26; --ok: #9ece6a; --warn: #e0af68; --bad: #f7768e; --cyan: #449dab; --magenta: #ad8ee6;
+  --shadow: 0 12px 34px rgb(0 0 0 / .45);
+  --font: "Omarchy", "JetBrainsMono Nerd Font", "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --dock-top: 0px; --dock-right: 0px; --dock-bottom: 0px; --dock-left: 0px; --keyboard-inset: 0px;
+  --safe-top: env(safe-area-inset-top, 0px); --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px); --safe-right: env(safe-area-inset-right, 0px);
+  --gap: 8px;
+  font: 13px/1.4 var(--font);
+  color: var(--fg);
+  background: var(--bg-3);
+}
+:root[data-theme-mode=light] { --shadow: 0 10px 30px rgb(0 0 0 / .16); }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { background: var(--bg-3); }
+body { margin: 0; overflow: hidden; height: 100dvh; background: var(--bg-3); -webkit-tap-highlight-color: transparent; }
+body[data-transport=webrtc] .vnc-only, body[data-transport=vnc] .webrtc-only { display: none !important; }
+button, select, textarea, input { font: inherit; color: inherit; }
+button {
+  min-height: 40px; padding: 0 14px; cursor: pointer; touch-action: manipulation;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px;
+}
+button:hover { background: var(--raise); }
+button:disabled { opacity: .4; cursor: default; }
+button.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 600; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+select { min-height: 40px; padding: 0 10px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; }
+textarea { width: 100%; min-height: 120px; padding: 12px; resize: vertical; background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; }
+input[type=range] { width: min(170px, 45vw); accent-color: var(--accent); }
+h1 { font-size: 20px; font-weight: 600; margin: 10px 0 6px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+body[data-density=touch] .mouse-only, body[data-density=mouse] .touch-only { display: none !important; }
+body[data-density=touch] button { min-height: 44px; }
+
+/* Desktop --------------------------------------------------------------------- */
+#desktop {
+  position: absolute; top: max(var(--dock-top), var(--safe-top)); left: var(--dock-left); right: var(--dock-right);
+  bottom: calc(var(--dock-bottom) + var(--keyboard-inset));
+  touch-action: none; overscroll-behavior: none; background: var(--bg-3);
+}
+#desktop > div { background: var(--bg-3) !important; }
+#desktop canvas { outline: none; }
+body[data-fit=width] #desktop canvas { margin-top: 0 !important; margin-bottom: auto !important; }
+#desktop [data-pan=true], #desktop [data-pan=true] canvas { cursor: grab !important; }
+/* WebRTC picture (video-surface.mjs): the video sized by the view, centred, scrolled when zoomed. */
+#desktop .video-screen { position: absolute; inset: 0; display: flex; overflow: hidden; touch-action: none; }
+#desktop .video-screen video { flex: none; display: block; margin: auto; background: var(--bg-3); outline: none; cursor: default; }
+#desktop .video-screen[data-typing=true] video { cursor: none; }
+#desktop .video-screen[data-pan=true] video { cursor: grab; }
+body[data-fit=width] #desktop .video-screen video { margin-top: 0; margin-bottom: auto; }
+/* Terminal (More → Terminal): over the desktop area, which stays connected underneath. */
+#terminal {
+  position: absolute; z-index: 15; top: max(var(--dock-top), var(--safe-top)); left: var(--dock-left); right: var(--dock-right);
+  bottom: var(--dock-bottom); display: flex; flex-direction: column; background: var(--bg-3);
+}
+.terminal-tabs { display: flex; gap: 4px; padding: 6px 8px 4px; border-bottom: 1px solid var(--line); }
+.terminal-tabs button { min-width: 34px; min-height: 30px; padding: 2px 8px; font-size: 12px; }
+.terminal-tabs button[aria-selected=true] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 700; }
+.terminal-panes { position: relative; flex: 1; min-height: 0; }
+.terminal-pane { position: absolute; inset: 0; padding: 6px; }
+body.terminal #pad-hint, body.terminal #touch-pointer, body.terminal #release-floating,
+body.terminal #keys-toggle, body.terminal #pointer-toggle, body.terminal #zoom-group, body.terminal #focus { display: none !important; }
+/* iOS 26 (Liquid Glass) blurs whatever sits under the status bar of a Home Screen web app unless the top edge holds
+   a box it can take a colour from. WebKit (LocalFrameView::fixedContainerEdges) hit-tests the middle of the top edge
+   4 px in, ignoring pointer-events, and walks up from the element it hits: the first position: fixed/sticky box at
+   least 90 % of the viewport wide, taller than 10 px, with an opaque background and no backdrop-filter on the way
+   gives a solid colour; a backdrop-filter gives the blur. This strip is that box, above everything (the welcome
+   screen and sheets too), so the toolbar and the desktop stay sharp; it also keeps the clock readable. iOS only. */
+#top-edge { display: none; }
+@supports (-webkit-touch-callout: none) {
+  #top-edge { display: block; position: fixed; top: 0; left: 0; right: 0; z-index: 70; height: max(var(--safe-top), 1px); background: var(--bg); pointer-events: none; }
+}
+#touch-pointer > svg, #touch-pointer > canvas { display: block; }
+#touch-pointer { position: fixed; left: 0; top: 0; z-index: 3; pointer-events: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+#last-frame { position: fixed; z-index: 1; filter: grayscale(.6) opacity(.65); pointer-events: none; }
+#pad-hint {
+  position: fixed; left: 0; right: 0; margin: 0; padding: 0 24px; text-align: center; z-index: 2;
+  color: var(--fg-3); font-size: 12px; line-height: 1.8; pointer-events: none; transition: opacity .6s;
+}
+#pad-hint b { display: block; color: var(--fg-2); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
+#pad-hint.used { opacity: 0; }
+
+/* Welcome and connection states ------------------------------------------------ */
+#welcome {
+  position: absolute; inset: 0; z-index: 30; display: flex; flex-direction: column; justify-content: center; align-items: center;
+  padding: 24px; text-align: center; background: color-mix(in srgb, var(--bg-3) 92%, transparent);
+}
+#welcome .actions { display: flex; gap: var(--gap); margin-top: 12px; }
+#welcome a.button { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border-radius: 10px; text-decoration: none; background: var(--accent); color: var(--on-accent); font-weight: 600; }
+.mark { font-size: 13px; letter-spacing: .3em; color: var(--accent); font-weight: 700; }
+#message { max-width: 44ch; color: var(--fg-2); line-height: 1.6; }
+.pill {
+  position: fixed; z-index: 25; display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 14px;
+  border-radius: 17px; background: var(--bg); border: 1px solid var(--line); color: var(--fg-2); font-size: 12px; box-shadow: var(--shadow);
+}
+#reconnect-pill { left: 50%; transform: translateX(-50%); top: calc(var(--dock-top) + var(--safe-top) + 12px); }
+.dot { width: 10px; height: 10px; flex: none; border-radius: 50%; background: var(--muted); }
+.dot.ok { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 25%, transparent); }
+.dot.warn { background: var(--warn); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 25%, transparent); animation: pulse 1s ease-in-out infinite; }
+.dot.bad { background: var(--bad); box-shadow: 0 0 0 3px color-mix(in srgb, var(--bad) 25%, transparent); }
+@keyframes pulse { 50% { opacity: .4; } }
+
+/* Toolbar ---------------------------------------------------------------------- */
+#toolbar {
+  position: fixed; z-index: 20; display: flex; align-items: stretch; gap: 2px; padding: 5px;
+  background: color-mix(in srgb, var(--bg) 92%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow);
+  transition: transform .25s ease, opacity .25s ease;
+}
+.tool {
+  display: flex; align-items: center; justify-content: center; gap: 7px; min-width: 44px; min-height: 44px; padding: 0 11px;
+  border: 0; border-radius: 11px; background: transparent; color: var(--fg-2); font-weight: 500; white-space: nowrap;
+}
+.tool:hover { background: var(--bg-2); }
+.tool[aria-pressed=true] { background: var(--raise); color: var(--fg); }
+.tool svg { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.tool svg.filled { fill: currentColor; stroke: none; }
+.tool .value { padding: 2px 7px; border: 1px solid var(--line); border-radius: 7px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.tool-group { display: flex; gap: 2px; }
+.sep { width: 1px; margin: 8px 3px; background: var(--line); }
+/* Floating: top/bottom centered, left/right vertically centered. */
+body[data-bar=top] #toolbar { top: calc(var(--safe-top) + 8px); left: 50%; transform: translateX(-50%); }
+body[data-bar=bottom] #toolbar { bottom: calc(var(--safe-bottom) + var(--keyboard-inset) + 8px); left: 50%; transform: translateX(-50%); }
+body[data-bar=left] #toolbar { left: calc(var(--safe-left) + 8px); top: 50%; transform: translateY(-50%); }
+body[data-bar=right] #toolbar { right: calc(var(--safe-right) + 8px); top: 50%; transform: translateY(-50%); }
+body[data-bar=left] #toolbar, body[data-bar=right] #toolbar { flex-direction: column; }
+body[data-bar=left] .tool-group, body[data-bar=right] .tool-group { flex-direction: column; }
+body[data-bar=left] .sep, body[data-bar=right] .sep { width: auto; height: 1px; margin: 3px 8px; }
+/* Stacked icon + label on phones and in vertical bars. */
+body[data-device=phone] .tool, body[data-bar=left] .tool, body[data-bar=right] .tool {
+  flex-direction: column; gap: 2px; padding: 4px 6px; font-size: 10px; letter-spacing: .02em;
+}
+body[data-device=phone][data-bar=top] #toolbar, body[data-device=phone][data-bar=bottom] #toolbar { left: 8px; right: 8px; transform: none; }
+body[data-device=phone][data-bar=top] .tool, body[data-device=phone][data-bar=bottom] .tool { flex: 1; min-width: 0; }
+body[data-device=phone] .tool .value { font-size: 11px; padding: 1px 5px; }
+/* Docked: the bar takes its own room instead of covering the desktop. */
+body.docked #toolbar { border-radius: 0; box-shadow: none; transform: none; background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
+body.docked[data-bar=top] #toolbar { top: 0; left: 0; right: 0; padding-top: calc(var(--safe-top) + 5px); border-width: 0 0 1px; justify-content: center; }
+body.docked[data-bar=bottom] #toolbar { bottom: var(--keyboard-inset); left: 0; right: 0; padding-bottom: calc(var(--safe-bottom) + 5px); border-width: 1px 0 0; justify-content: center; }
+body.docked[data-bar=left] #toolbar { left: 0; top: 0; bottom: 0; padding-left: calc(var(--safe-left) + 5px); border-width: 0 1px 0 0; justify-content: center; }
+body.docked[data-bar=right] #toolbar { right: 0; top: 0; bottom: 0; padding-right: calc(var(--safe-right) + 5px); border-width: 0 0 0 1px; justify-content: center; }
+body.docked[data-device=phone][data-bar=top] #toolbar, body.docked[data-device=phone][data-bar=bottom] #toolbar { left: 0; right: 0; }
+/* Sleeping (floating only). */
+#toolbar.sleeping { opacity: 0; pointer-events: none; }
+body[data-bar=top] #toolbar.sleeping { transform: translate(-50%, -130%); }
+body[data-bar=bottom] #toolbar.sleeping { transform: translate(-50%, 130%); }
+body[data-device=phone][data-bar=top] #toolbar.sleeping { transform: translateY(-130%); }
+body[data-device=phone][data-bar=bottom] #toolbar.sleeping { transform: translateY(130%); }
+body[data-bar=left] #toolbar.sleeping { transform: translate(-130%, -50%); }
+body[data-bar=right] #toolbar.sleeping { transform: translate(130%, -50%); }
+
+#grabber { position: fixed; z-index: 19; display: grid; place-items: center; min-height: 0; padding: 0; border: 0; background: transparent; }
+#grabber span { display: block; border-radius: 3px; background: var(--fg-3); opacity: .6; }
+#grabber.invisible span { opacity: 0; }
+body[data-bar=top] #grabber, body[data-bar=bottom] #grabber { left: 50%; width: 140px; height: 30px; margin-left: -70px; }
+body[data-bar=top] #grabber { top: var(--safe-top); }
+body[data-bar=bottom] #grabber { bottom: calc(var(--safe-bottom) + var(--keyboard-inset)); }
+body[data-bar=top] #grabber span, body[data-bar=bottom] #grabber span { width: 44px; height: 5px; }
+body[data-bar=left] #grabber, body[data-bar=right] #grabber { top: 50%; width: 30px; height: 140px; margin-top: -70px; }
+body[data-bar=left] #grabber { left: var(--safe-left); }
+body[data-bar=right] #grabber { right: var(--safe-right); }
+body[data-bar=left] #grabber span, body[data-bar=right] #grabber span { width: 5px; height: 44px; }
+
+/* Popovers and menus ----------------------------------------------------------- */
+.popover {
+  position: fixed; z-index: 40; min-width: 240px; max-width: calc(100vw - 24px); max-height: calc(100dvh - 120px); overflow: auto;
+  padding: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow);
+}
+.popover h2, .panel h2 { margin: 8px 8px 6px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); }
+.facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 18px; margin: 4px 8px 8px; font-variant-numeric: tabular-nums; }
+.facts dt { color: var(--fg-3); } .facts dd { margin: 0; text-align: right; }
+.menu .item { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 0 10px; border: 0; border-radius: 9px; background: transparent; text-align: left; font-size: 14px; }
+.menu .item:hover { background: var(--bg-2); }
+.menu .item svg { width: 18px; height: 18px; flex: none; fill: none; stroke: var(--fg-3); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.menu .hint { margin-left: auto; font-size: 11px; color: var(--fg-3); }
+#keys { width: min(560px, calc(100vw - 24px)); }
+#keys > div { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 6px 6px; }
+#keys button { min-height: 36px; padding: 0 12px; font-size: 12px; }
+#keys #modifiers { display: grid; grid-template-columns: repeat(4, minmax(56px, 1fr)); }
+.key-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-right: 6px; }
+button[data-state=once] { background: color-mix(in srgb, var(--accent) 35%, var(--bg-2)); color: var(--fg); }
+button[data-state=latched], button[data-state=lock] { background: var(--warn); color: var(--bg); border-color: var(--warn); }
+
+/* Sheets ----------------------------------------------------------------------- */
+#scrim { position: fixed; inset: 0; z-index: 44; background: rgb(0 0 0 / .3); }
+.sheet { position: fixed; z-index: 45; display: flex; flex-direction: column; background: var(--bg); box-shadow: var(--shadow); }
+body[data-device=phone] .sheet { left: 0; right: 0; bottom: 0; max-height: 88dvh; border-radius: 20px 20px 0 0; padding-bottom: var(--safe-bottom); }
+body:not([data-device=phone]) .sheet { top: calc(var(--safe-top) + 12px); bottom: calc(var(--safe-bottom) + 12px); right: 12px; width: min(420px, calc(100vw - 24px)); border: 1px solid var(--line); border-radius: 16px; }
+body:not([data-device=phone]) .sheet.wide { width: min(680px, calc(100vw - 24px)); }
+.sheet > header { display: flex; align-items: center; gap: 12px; padding: 12px 12px 10px 20px; border-bottom: 1px solid var(--line); }
+.sheet > header h2 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--fg); }
+.sheet .close { margin-left: auto; min-width: 44px; font-size: 20px; }
+.sheet .open-page { margin-left: auto; color: var(--fg-3); font-size: 12px; }
+.sheet .open-page + .close { margin-left: 0; }
+.sheet .body { overflow-y: auto; padding: 6px 20px 24px; overscroll-behavior: contain; }
+.buttons { display: flex; flex-wrap: wrap; gap: var(--gap); }
+.sheet .buttons { margin-top: 12px; }
+.note { font-size: 12px; line-height: 1.6; color: var(--fg-3); margin: 12px 0 0; }
+.group { padding: 14px 0 8px; border-bottom: 1px solid var(--line); }
+.group:last-child { border-bottom: 0; }
+.group h3 { margin: 0 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 6px 14px; min-height: 52px; padding: 4px 0; }
+/* A wide choice moves under its label when both do not fit side by side (phones). */
+.row.stack { flex-wrap: wrap; }
+.row.stack > span:first-child { flex: 1 1 200px; }
+.row.stack > .seg { margin-left: auto; }
+.row > span:first-child, .row > label { flex: 1 1 auto; min-width: 0; font-size: 14px; }
+.row small { display: block; margin-top: 2px; font-size: 11px; color: var(--fg-3); }
+.row .value { color: var(--fg-2); font-size: 13px; }
+.seg { flex: none; display: inline-flex; flex-wrap: nowrap; justify-content: flex-end; padding: 3px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line); }
+.seg button { min-height: 34px; padding: 0 10px; border: 0; border-radius: 7px; background: transparent; color: var(--fg-2); font-size: 12px; }
+.seg button[aria-pressed=true] { background: var(--bg); color: var(--fg); font-weight: 600; box-shadow: 0 1px 2px rgb(0 0 0 / .25); }
+.switch { position: relative; width: 50px; height: 30px; flex: none; }
+.switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.switch span { position: absolute; inset: 0; border-radius: 15px; background: var(--muted); transition: background .2s; pointer-events: none; }
+.switch span::after { content: ""; position: absolute; left: 3px; top: 3px; width: 24px; height: 24px; border-radius: 50%; background: var(--fg); transition: transform .2s; }
+.switch input:checked + span { background: var(--accent); }
+.switch input:checked + span::after { transform: translateX(20px); background: var(--on-accent); }
+.switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Help (in the sheet and on /help.html) ---------------------------------------- */
+.help h3 { margin: 22px 0 8px; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+.help p, .help li { line-height: 1.65; color: var(--fg-2); max-width: 68ch; }
+.help .table { overflow-x: auto; }
+.help table { width: 100%; border-collapse: collapse; }
+.help th, .help td { padding: 9px 8px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+.help th { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--fg-3); }
+.help td:first-child { white-space: nowrap; color: var(--fg); }
+.fingers { display: inline-flex; gap: 3px; margin-right: 8px; vertical-align: middle; }
+.fingers i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+kbd { padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; background: var(--bg-2); font: 12px var(--font); }
+body.help-page { overflow: auto; height: auto; min-height: 100dvh; background: var(--bg); }
+body.help-page main { max-width: 760px; margin: 0 auto; padding: calc(var(--safe-top) + 28px) 20px 48px; }
+
+/* Toast, release pill ---------------------------------------------------------- */
+#toast {
+  position: fixed; z-index: 50; left: 50%; top: 24%; transform: translateX(-50%); padding: 10px 16px; border-radius: 14px;
+  background: var(--accent); color: var(--on-accent); font-weight: 600; box-shadow: var(--shadow); pointer-events: none; white-space: nowrap;
+  animation: toast-in .18s ease-out;
+}
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 6px); } }
+#release-floating { right: calc(var(--safe-right) + 12px); bottom: calc(var(--dock-bottom) + var(--keyboard-inset) + var(--safe-bottom) + 12px); cursor: pointer; }
+.pill.warn { background: var(--warn); color: var(--bg); border-color: var(--warn); font-weight: 600; }
+
+/* Onboarding --------------------------------------------------------------------- */
+.modal { position: fixed; inset: 0; z-index: 60; display: flex; overflow-y: auto; padding: max(16px, var(--safe-top)) max(16px, var(--safe-right)) max(16px, var(--safe-bottom)) max(16px, var(--safe-left)); background: rgb(0 0 0 / .4); }
+/* margin: auto centres the card and, unlike place-items, keeps a card taller than the screen scrollable. */
+.card { margin: auto; width: min(390px, 100%); padding: 24px; border-radius: 20px; background: var(--bg); border: 1px solid var(--line); box-shadow: var(--shadow); }
+.card h2 { margin: 12px 0 8px; font-size: 19px; line-height: 1.3; text-wrap: balance; }
+.card p { margin: 0 0 18px; line-height: 1.6; color: var(--fg-2); }
+.card footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.steps { display: flex; gap: 6px; }
+.steps i { width: 22px; height: 4px; border-radius: 2px; background: var(--line); }
+.steps i.on { background: var(--accent); }
+.illustration { position: relative; height: 120px; margin: 10px 0 14px; overflow: hidden; border-radius: 14px; background: var(--bg-2); border: 1px solid var(--line); }
+.illustration .screen { position: absolute; left: 50%; top: 14px; width: 150px; height: 60px; margin-left: -75px; border-radius: 6px; background: linear-gradient(135deg, var(--raise), var(--bg-3)); border: 1px solid var(--line); }
+.illustration .arrow { position: absolute; left: 50%; top: 30px; width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 12px solid var(--fg); transform: rotate(-25deg); animation: slide 2.4s ease-in-out infinite; }
+.illustration .finger { position: absolute; left: 50%; bottom: 14px; width: 18px; height: 18px; margin-left: -9px; border-radius: 50%; background: var(--accent); animation: slide-finger 2.4s ease-in-out infinite; }
+@keyframes slide { 50% { transform: translateX(46px) rotate(-25deg); } }
+@keyframes slide-finger { 50% { transform: translateX(46px); } }
+.illustration .three { position: absolute; top: 50%; left: 50%; display: flex; gap: 8px; margin: -9px 0 0 -35px; animation: three 2.6s ease-in-out infinite; }
+.illustration .three i { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); }
+@keyframes three { 25% { transform: translateX(-40px); } 50% { transform: none; } 75% { transform: translateY(-26px); } }
+.illustration .grip { position: absolute; left: 50%; top: 10px; width: 44px; height: 5px; margin-left: -22px; border-radius: 3px; background: var(--fg-3); }
+.illustration .bar { position: absolute; left: 50%; top: 24px; width: 190px; height: 34px; margin-left: -95px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); animation: peek 2.6s ease-in-out infinite; }
+@keyframes peek { 0%, 20% { opacity: 0; transform: translateY(-12px); } 40%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+
+/* Key event log ------------------------------------------------------------------ */
+#debug {
+  position: fixed; top: calc(var(--dock-top) + 70px); right: 10px; z-index: 35; width: min(460px, 95vw); max-height: 36vh; overflow: auto;
+  margin: 0; padding: 12px; background: color-mix(in srgb, var(--bg-3) 94%, transparent); color: var(--ok); font-size: 11px; pointer-events: none; border-radius: 10px;
+}
+
+/* Touch keyboard: a bottom sheet that shrinks the desktop instead of covering it. */
+#touch-keyboard {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 22;
+  padding: 6px 4px calc(var(--safe-bottom) + 6px);
+  background: var(--bg-2); border-top: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 6px;
+  user-select: none; -webkit-user-select: none; touch-action: none;
+}
+#touch-keyboard .row { display: flex; gap: 5px; min-height: 0; justify-content: stretch; }
+#touch-keyboard .row.functions .key, #touch-keyboard .row.workspaces .key { font-size: 11px; min-height: 36px; padding: 2px; }
+#touch-keyboard .key {
+  position: relative; flex: 1 1 0; min-width: 0; min-height: 44px; padding: 0; font-size: 18px;
+  background: var(--bg); border: 0; border-radius: 7px; box-shadow: 0 1px 0 var(--line);
+}
+#touch-keyboard .key.wide { font-size: 13px; background: var(--raise); }
+#touch-keyboard .key.down { background: var(--accent); color: var(--on-accent); transform: translateY(1px); }
+#touch-keyboard .key[data-state=once] { background: color-mix(in srgb, var(--accent) 35%, var(--bg)); }
+#touch-keyboard .key[data-state=lock], #touch-keyboard .key[data-state=latched] { background: var(--warn); color: var(--bg); }
+#touch-keyboard .key[data-alternates]::after { content: ''; position: absolute; right: 4px; top: 3px; width: 4px; height: 4px; border-radius: 50%; background: var(--fg-3); }
+#touch-keyboard .alternates {
+  position: absolute; display: flex; gap: 4px; padding: 5px; z-index: 23;
+  background: var(--bg); border: 1px solid var(--accent); border-radius: 8px; box-shadow: var(--shadow);
+}
+#touch-keyboard .alternates .key { min-width: 44px; flex: 0 0 auto; }
+#touch-keyboard .alternates .key.active { background: var(--accent); color: var(--on-accent); }
+/* Held space bar: the keyboard is a trackpad until the finger lifts. */
+#touch-keyboard.padmode .key { color: transparent; box-shadow: none; background: color-mix(in srgb, var(--bg) 50%, transparent); }
+#touch-keyboard.padmode .key[data-action=space] { color: var(--accent); background: var(--bg); }
+@media (min-width: 900px) { #touch-keyboard { padding-left: max(4px, calc((100vw - 900px) / 2)); padding-right: max(4px, calc((100vw - 900px) / 2)); } }
+@media (orientation: landscape) and (max-height: 500px) {
+  #touch-keyboard { gap: 3px; padding-top: 3px; }
+  #touch-keyboard .key { min-height: 34px; font-size: 15px; }
+  #touch-keyboard .row.functions { display: none; }
+}
+
+/* Phones in landscape: the onboarding card drops its illustration to fit. */
+@media (max-height: 500px) { .illustration { display: none; } .card { padding: 16px 20px; } .card h2 { margin-top: 6px; } }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

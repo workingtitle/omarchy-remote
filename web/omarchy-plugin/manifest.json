@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "omarchy-remote.status",
+  "name": "Omarchy Remote",
+  "version": "0.1.0",
+  "author": "Omarchy Remote",
+  "description": "Remote-control status; click to pair a phone, tablet or Mac",
+  "kinds": ["bar-widget"],
+  "entryPoints": { "barWidget": "Widget.qml" },
+  "barWidget": {
+    "displayName": "Omarchy Remote",
+    "description": "Remote-control status; click to pair a device",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

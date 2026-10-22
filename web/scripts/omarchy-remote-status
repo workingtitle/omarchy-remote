@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Waybar custom module (Omarchy 3 and other Waybar setups; Omarchy 4 uses web/omarchy-plugin): one JSON
+# line with the remote-control state. Click opens pairing.
+# Example module (add "custom/omarchy-remote" to a modules list in ~/.config/waybar/config.jsonc):
+#   "custom/omarchy-remote": {
+#     "exec": "~/Projects/omarchy-remote/web/scripts/omarchy-remote-status",
+#     "return-type": "json", "interval": 3,
+#     "on-click": "omarchy-launch-floating-terminal-with-presentation ~/Projects/omarchy-remote/web/scripts/omarchy-remote-pair"
+#   }
+port="${PORT:-8099}"
+status=$(curl -fsS -m 2 -H "Host: localhost:$port" "http://127.0.0.1:$port/api/local/status" 2>/dev/null) || {
+  printf '{"text":"","tooltip":"Omarchy Remote is not running","class":"off"}\n'; exit 0; }
+if [[ $(jq -r .pending <<<"$status") != 0 ]]; then
+  printf '{"text":"󰌷 ?","tooltip":"A device is waiting for pairing approval","class":"pending"}\n'
+elif [[ $(jq -r .busy <<<"$status") == true ]]; then
+  printf '{"text":"󰌷","tooltip":"Remote control active (%s)","class":"active"}\n' "$(jq -r '.transport // "connected"' <<<"$status")"
+else
+  printf '{"text":"󰌷","tooltip":"Omarchy Remote ready · click to pair a device","class":"idle"}\n'
+fi

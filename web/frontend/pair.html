@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pair · Omarchy Remote</title>
+<link rel="icon" href="icon.svg">
+<link rel="stylesheet" href="style.css">
+<style>
+  body { background: var(--bg); color: var(--fg); overflow: auto; height: auto; min-height: 100dvh; padding: var(--safe-top) var(--safe-right) 0 var(--safe-left); }
+  main { max-width: 26rem; margin: 12vh auto 0; padding: 0 20px; display: grid; gap: 14px; }
+  h1 { margin: 0; font-size: 22px; }
+  label { display: grid; gap: 6px; color: var(--muted); }
+  input { font: inherit; font-size: 18px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-2); color: var(--fg); }
+  #code { letter-spacing: .3em; font-variant-numeric: tabular-nums; }
+  button, .app { background: var(--accent); color: var(--on-accent); border: 0; border-radius: 8px; padding: 10px; font: inherit; font-weight: 600; }
+  .app { display: block; text-align: center; text-decoration: none; font-size: 16px; padding: 14px; }
+  #app-row { display: grid; gap: 8px; }
+  #app-row p, #mac-hint { margin: 0; color: var(--fg-2); }
+  #browser-toggle { background: none; color: var(--accent); padding: 4px; font-weight: 400; }
+  #message a { color: var(--accent); }
+  #message { min-height: 3em; margin: 0; }
+  code { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Pair this device</h1>
+  <p id="intro">Confirm the request on the Omarchy machine to finish.</p>
+  <div id="app-row" hidden>
+    <a class="app" id="app-link">Open in the Omarchy Remote App</a>
+    <p>Pairs the app on this device. Or <button id="browser-toggle" type="button">pair this browser instead</button>.</p>
+  </div>
+  <p id="mac-hint" hidden>Using the Omarchy Remote app for Mac? Pair in the app instead (Add a Machine, same code). This page pairs only this browser.</p>
+  <form id="form">
+    <label id="code-row">Pairing code shown on the machine<input id="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6"></label>
+    <label>Device name<input id="name" maxlength="48" required></label>
+    <button id="submit" type="submit">Pair</button>
+  </form>
+  <p id="message" role="status"></p>
+</main>
+<script type="module" src="pair.mjs"></script>
+</body>
+</html>

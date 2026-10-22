@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+"""PAM helper (pam_exec): ask a paired phone, tablet or Mac to approve this sudo with Face ID / Touch ID.
+
+Runs before sudo's password prompt (see omarchy-remote-sudo-approval). Exit 0 = approved; anything else, including
+every error, makes pam_exec fail and sudo falls through to the password prompt as it always did. It asks the Omarchy
+Remote service on this machine (127.0.0.1) and never sees or handles a password.
+"""
+import json
+import os
+import sys
+import urllib.request
+
+BASE = os.environ.get('OMARCHY_REMOTE_LOCAL_URL', 'http://127.0.0.1:8099')
+WAIT = 25   # seconds: a little longer than the service's own 20 s
+
+
+def ask(path, payload=None, timeout=WAIT):
+    data = None if payload is None else json.dumps(payload).encode()
+    request = urllib.request.Request(BASE + path, data=data, method='GET' if data is None else 'POST',
+                                     headers={'Content-Type': 'application/json'})
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return json.loads(response.read(65536))
+
+
+def command_of(pid):
+    """The command line of the process that asked (pam_exec runs inside sudo, so its parent is sudo)."""
+    try:
+        with open('/proc/%d/cmdline' % pid, 'rb') as handle:
+            return ' '.join(part.decode('utf-8', 'replace') for part in handle.read(2048).split(b'\0') if part)
+    except OSError:
+        return ''
+
+
+def main(environ=os.environ, parent=None):
+    if environ.get('PAM_TYPE', 'auth') != 'auth':
+        return 1
+    try:
+        if not ask('/api/local/approval/ready', timeout=2).get('ready'):
+            return 1   # no device connected: the password prompt, at once
+        decision = ask('/api/local/approval/request', {
+            'service': environ.get('PAM_SERVICE', 'sudo'),
+            'user': environ.get('PAM_RUSER') or environ.get('PAM_USER', ''),
+            'command': command_of(os.getppid() if parent is None else parent),
+        }).get('decision')
+    except Exception:
+        return 1
+    return 0 if decision == 'approved' else 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())
